@@ -6,7 +6,10 @@ def relu(X):
     return np.maximum(0,X)
 
 def softmax(X):
-    return np.exp(X) / sum(np.exp(X))
+    Z = X - max(X)
+    numerator = np.exp(Z)
+    denominator = np.sum(numerator)
+    return numerator / denominator
 
 # Calculates the output of a given layer
 def calculate_layer_output(w, prev_layer_output, b, actv_func):
