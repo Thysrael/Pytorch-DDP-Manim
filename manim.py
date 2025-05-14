@@ -135,7 +135,7 @@ class VisualiseNeuralNetwork(Scene):
         self.TRAINING_DATA_POINT = 0
         self.HEADER_HEIGHT = -3.5
         self.HEADER_FONT_SIZE = 24
-        self.ANIMATION_RUN_TIME = 0.2
+        self.ANIMATION_RUN_TIME = 0.1
 
         training_image = train[self.TRAINING_DATA_POINT:self.TRAINING_DATA_POINT + 1, :].T
         input_image = self.create_input_image(training_image, left_shift=5)
@@ -145,6 +145,8 @@ class VisualiseNeuralNetwork(Scene):
         h1_node_group, h1_nodes_list = self.create_nodes(3, 0.25, num_nodes)
         h2_node_group, h2_nodes_list = self.create_nodes(0, 0.25, num_nodes)
         o_node_group, o_nodes_list = self.create_nodes(-3, 0.25, num_nodes)
+
+        gradient = self.create_gradient(np.zeros((10, 10)), np.zeros((10, 10)), 0, 4)
 
         # Create connections
         connections_1 = self.create_connections(h1_nodes_list, h2_nodes_list, w2)
@@ -176,6 +178,13 @@ class VisualiseNeuralNetwork(Scene):
         input_image_text.next_to(input_image, UP)
         self.add(input_image_text)
 
+        gradient_text = self.create_text("Gradient",
+                                         self.HEADER_FONT_SIZE,
+                                         0,
+                                         0)
+        gradient_text.next_to(gradient, LEFT)
+        self.add(gradient_text)
+
         # Create prediction text & add to scene
         prediction_text_group = self.create_prediction_text("...", -5.5)
         self.add(prediction_text_group)
@@ -193,20 +202,21 @@ class VisualiseNeuralNetwork(Scene):
                   Create(h2_node_group),
                   Create(o_node_group),
                   Create(connections_1),
-                  Create(connections_2)
+                  Create(connections_2),
+                  Create(gradient)
                   )
         self.wait(0.5)
 
         # Training
         while epoch < 20:
             print(f'------------- Epoch {epoch} -------------')
+            self.TRAINING_DATA_POINT = np.random.randint(low=0, high=train.shape[0])
 
             # Iterate through training data
             for index in range(0, train.shape[0]):
-                self.TRAINING_DATA_POINT = np.random.randint(low=0, high=train.shape[0])
                 # Select a single image and associated y vector
-                X = train[index:index+1,:].T
-                y = Y[index:index+1].T
+                X = train[index:index + 1,:].T
+                y = Y[index:index + 1].T
 
                 # 1. Forward pass: compute Output/Prediction (o)
                 h1 = calculate_layer_output(w1, X, b1, relu)
@@ -244,6 +254,9 @@ class VisualiseNeuralNetwork(Scene):
                     self.animate_nodes(o_node_group, o, -3, 0.25, num_nodes)
                     self.animate_connections(h2_nodes_list, o_nodes_list, connections_2, w3)
                     self.animate_prediction_text(prediction_text_group, get_prediction(o), -5.5)
+                    # print(dL2_dw2)
+                    # print(dL3_dw3)
+                    self.animate_gradient(gradient, dL2_dw2, dL3_dw3, 0, 4)
 
             # Compute & print Accuracy (%)
             accuracy = compute_accuracy(train, label, w1, b1, w2, b2, w3, b3)
@@ -264,9 +277,9 @@ class VisualiseNeuralNetwork(Scene):
 
         # Create list of squares to represent pixels
         squares = [
-            Square(fill_color=WHITE
-                   , fill_opacity=training_image[i]
-                   , stroke_width=0.5).scale(0.03)
+            Square(fill_color=WHITE,
+                   fill_opacity=training_image[i],
+                   stroke_width=0.5).scale(0.03)
             for i in range(square_count)
         ]
 
@@ -277,6 +290,42 @@ class VisualiseNeuralNetwork(Scene):
         group.shift(left_shift * LEFT)
 
         return group
+
+    def normalize(vector):
+        min_val = np.min(vector)
+        max_val = np.max(vector)
+        if max_val == min_val:
+            return np.zeros_like(vector)
+        return (vector - min_val) / (max_val - min_val)
+
+    def create_gradient(self, gradient1, gradient2, left_shift, down_shift):
+        # gradient: (10, 10) only the hidden layer weight gradient
+        # we have two hidden layers
+        rows = 4
+        scale = 0
+        gf1 = normalize(gradient1.flatten())
+        gf2 = normalize(gradient2.flatten())
+
+        squares = [
+            Square(fill_color=TEAL_A,
+                   fill_opacity=gf1[i] + scale,
+                   stroke_width=0.5).scale(0.08)
+            for i in range(gf1.shape[0])
+        ]
+
+        squares += [
+            Square(fill_color=TEAL_B,
+                   fill_opacity=gf2[i] + scale,
+                   stroke_width=0.5).scale(0.08)
+            for i in range(gf2.shape[0])
+        ]
+
+        group = VGroup(*squares).arrange_in_grid(rows=int(rows), buff=0)
+
+        group.shift(left_shift * LEFT).shift(down_shift * DOWN)
+
+        return group
+
 
     def create_nodes(self, left_shift, down_shift, num_nodes, layer_output=None):
         # Create VGroup & list to hold created nodes
@@ -387,6 +436,10 @@ class VisualiseNeuralNetwork(Scene):
         # 2. Transform old input image to new image
         self.play(Transform(input_image, new_input_image), run_time=self.ANIMATION_RUN_TIME)
 
+    def animate_gradient(self, g, g1, g2, left_shift, down_shift):
+        new_g = self.create_gradient(g1, g2, left_shift, down_shift)
+        self.play(Transform(g, new_g), run_time=self.ANIMATION_RUN_TIME)
+
     def animate_nodes(self, layer_group, layer_output
                       , left_shift, down_shift, num_neurons):
         # 1. Create nodes with new parameters
@@ -395,11 +448,9 @@ class VisualiseNeuralNetwork(Scene):
                                                num_neurons,
                                                layer_output)
         # 2. Transform old nodes to new nodes
-        self.play(Transform(layer_group, new_layer_group)
-                  , run_time=self.ANIMATION_RUN_TIME)
+        self.play(Transform(layer_group, new_layer_group), run_time=self.ANIMATION_RUN_TIME)
 
-    def animate_connections(self, left_layer_centers, right_layer_centers
-                            , line_group, w):
+    def animate_connections(self, left_layer_centers, right_layer_centers, line_group, w):
         # 1. Create connections with new parameters
         new_line_group = self.create_connections(left_layer_centers,
                                                  right_layer_centers,
