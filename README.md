@@ -11,3 +11,11 @@ pip install -r requirements.txt
 ```
 
 Download the dataset from this [link](https://www.kaggle.com/competitions/digit-recognizer/data) to the `./digit-recognizer/` dir.
+
+## Run
+
+Use the following command to build the video:
+
+``` shell
+manim -pqh manim.py VisualiseNeuralNetwork
+```
