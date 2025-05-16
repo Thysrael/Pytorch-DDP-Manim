@@ -126,7 +126,7 @@ class VisualNode:
         self.prediction.next_to(self.input_image, DOWN)
         self.prediction.shift(DOWN)
 
-        self.gradient = self.create_gradient(np.zeros((10, 10)), np.zeros((10, 10)))
+        self.gradient, self.gradient_list = self.create_gradient(np.zeros((10, 10)), np.zeros((10, 10)))
         self.gradient.next_to(self.h2_node_group, DOWN)
         self.gradient_text = Text("Gradient", font_size=HEADER_FONT_SIZE)
         self.gradient_text.next_to(self.gradient, LEFT)
@@ -334,7 +334,7 @@ class VisualNode:
 
         group = VGroup(*squares).arrange_in_grid(rows=int(rows), buff=0)
 
-        return group
+        return group, squares
 
 class VisualiseNeuralNetwork(Scene):
     def construct(self):
@@ -362,7 +362,7 @@ class VisualiseNeuralNetwork(Scene):
 
         # Set hyperparameter(s)
         learning_rate = 0.01
-        epoch = 20
+        epoch = 5
         previous_accuracy = 100
         accuracy = 0
 
@@ -433,6 +433,8 @@ class VisualiseNeuralNetwork(Scene):
                 # Compute Hidden Layer 1 derivatives
                 dL1_dw1, _, dL1_db1 = layer_backprop(dL2_dh2, h1, X, w1, relu)
 
+                animate = True if index == trace_point + 1 else False
+
                 if index % 2 == 0:
                     # record
                     X_tmp = X
@@ -441,7 +443,6 @@ class VisualiseNeuralNetwork(Scene):
                     dL3_dw3_tmp, dL3_dh2_tmp, dL3_db3_tmp = dL3_dw3, dL3_dh2, dL3_db3
                     dL2_dw2_tmp, dL2_dh2_tmp, dL2_db2_tmp = dL2_dw2, dL2_dh2, dL2_db2
                     dL1_dw1_tmp, dL1_db1_tmp = dL1_dw1, dL1_db1
-                    # TODO: animate gradient
                 else:
                     # reduce
                     dL_do = (dL_do + dL_do_tmp) / 2
@@ -449,31 +450,40 @@ class VisualiseNeuralNetwork(Scene):
                     dL2_dw2, dL2_dh2, dL2_db2 = (dL2_dw2 + dL2_dw2_tmp) / 2, (dL2_dh2 + dL2_dh2_tmp) / 2, (dL2_db2 + dL2_db2_tmp) / 2
                     dL1_dw1, dL1_db1 = (dL1_dw1 + dL1_dw1_tmp) / 2, (dL1_db1 + dL1_db1_tmp) / 2
 
-                    # TODO: animate gradient
-
                     # 4. Update weights & biases
                     w1, b1 = gradient_descent(w1, b1, dL1_dw1, dL1_db1, learning_rate)
                     w2, b2 = gradient_descent(w2, b2, dL2_dw2, dL2_db2, learning_rate)
                     w3, b3 = gradient_descent(w3, b3, dL3_dw3, dL3_db3, learning_rate)
 
-                    # TODO: animate reduce
-
-                animate = True if index == trace_point + 1 else False
                 if animate:
-                    self.play(node_1.animate_input_image(X_tmp), run_time=ANIMATION_RUN_TIME)
-                    self.play(node_2.animate_input_image(X) , run_time=ANIMATION_RUN_TIME)
-                    self.play(node_1.animate_nodes(h1_tmp, 0), run_time=ANIMATION_RUN_TIME)
-                    self.play(node_2.animate_nodes(h1, 0), run_time=ANIMATION_RUN_TIME)
-                    self.play(node_1.animate_nodes(h2_tmp, 1), run_time=ANIMATION_RUN_TIME)
-                    self.play(node_2.animate_nodes(h2, 1), run_time=ANIMATION_RUN_TIME)
-                    self.play(node_1.animate_connections(w2, 0), run_time=ANIMATION_RUN_TIME)
-                    self.play(node_2.animate_connections(w2, 0), run_time=ANIMATION_RUN_TIME)
-                    self.play(node_1.animate_nodes(o_tmp, 2), run_time=ANIMATION_RUN_TIME)
-                    self.play(node_2.animate_nodes(o, 2), run_time=ANIMATION_RUN_TIME)
-                    self.play(node_1.animate_connections(w3, 1), run_time=ANIMATION_RUN_TIME)
-                    self.play(node_2.animate_connections(w3, 1), run_time=ANIMATION_RUN_TIME)
-                    self.play(node_1.animate_prediction_text(get_prediction(o_tmp)), run_time=ANIMATION_RUN_TIME)
-                    self.play(node_2.animate_prediction_text(get_prediction(o)), run_time=ANIMATION_RUN_TIME)
+                    self.animate_gradient(node_1, node_2, dL2_dw2_tmp, dL3_dw3_tmp, dL2_dw2, dL3_dw3)
+                    self.play(node_1.animate_input_image(X_tmp),
+                              node_2.animate_input_image(X),
+                              run_time=ANIMATION_RUN_TIME)
+
+                    self.play(node_1.animate_nodes(h1_tmp, 0),
+                              node_2.animate_nodes(h1, 0),
+                              run_time=ANIMATION_RUN_TIME)
+
+                    self.play(node_1.animate_connections(w2, 0),
+                              node_2.animate_connections(w2, 0),
+                              run_time=ANIMATION_RUN_TIME)
+
+                    self.play(node_1.animate_nodes(h2_tmp, 1),
+                              node_2.animate_nodes(h2, 1),
+                              run_time=ANIMATION_RUN_TIME)
+
+                    self.play(node_1.animate_connections(w3, 1),
+                              node_2.animate_connections(w3, 1),
+                              run_time=ANIMATION_RUN_TIME)
+
+                    self.play(node_1.animate_nodes(o_tmp, 2),
+                              node_2.animate_nodes(o, 2),
+                              run_time=ANIMATION_RUN_TIME)
+
+                    self.play(node_1.animate_prediction_text(get_prediction(o_tmp)),
+                              node_2.animate_prediction_text(get_prediction(o)),
+                              run_time=ANIMATION_RUN_TIME)
 
             # Compute & print Accuracy (%)
             accuracy = compute_accuracy(train, label, w1, b1, w2, b2, w3, b3)
@@ -481,3 +491,12 @@ class VisualiseNeuralNetwork(Scene):
             new_status = Text(f'Epoch: {e:02}\tAccuracy: {accuracy:05.2f}%', font_size=1.8 * HEADER_FONT_SIZE)
             new_status.move_to(status.get_center())
             self.play(Transform(status, new_status))
+
+    def animate_gradient(self, node_1, node_2, g1_1, g2_1, g1_2, g2_2):
+        new_gradient_1, node_1.gradient_list = node_1.create_gradient(g1_1, g2_1)
+        new_gradient_1.move_to(node_1.gradient.get_center())
+        t_1 = Transform(node_1.gradient, new_gradient_1)
+        new_gradient_2, node_2.gradient_list = node_2.create_gradient(g1_2, g2_2)
+        new_gradient_2.move_to(node_2.gradient.get_center())
+        t_2 = Transform(node_2.gradient, new_gradient_2)
+        self.play(t_1, t_2)
