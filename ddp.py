@@ -362,9 +362,8 @@ class VisualiseNeuralNetwork(Scene):
         test = test / 255
 
         # Set hyperparameter(s)
-        learning_rate = 0.01
-        epoch = 20
-        previous_accuracy = 100
+        learning_rate = 0.015
+        epoch = 16
         accuracy = 0
 
         # Randomly initialize weights & biases
@@ -446,10 +445,10 @@ class VisualiseNeuralNetwork(Scene):
                     dL1_dw1_tmp, dL1_db1_tmp = dL1_dw1, dL1_db1
                 else:
                     # reduce
-                    dL_do = (dL_do + dL_do_tmp) / 2
-                    dL3_dw3, dL3_dh2, dL3_db3 = (dL3_dw3 + dL3_dw3_tmp) / 2, (dL3_dh2 + dL3_dh2_tmp) / 2, (dL3_db3 + dL3_db3_tmp) / 2
-                    dL2_dw2, dL2_dh2, dL2_db2 = (dL2_dw2 + dL2_dw2_tmp) / 2, (dL2_dh2 + dL2_dh2_tmp) / 2, (dL2_db2 + dL2_db2_tmp) / 2
-                    dL1_dw1, dL1_db1 = (dL1_dw1 + dL1_dw1_tmp) / 2, (dL1_db1 + dL1_db1_tmp) / 2
+                    dL_do = dL_do + dL_do_tmp
+                    dL3_dw3, dL3_dh2, dL3_db3 = dL3_dw3 + dL3_dw3_tmp, dL3_dh2 + dL3_dh2_tmp, dL3_db3 + dL3_db3_tmp
+                    dL2_dw2, dL2_dh2, dL2_db2 = dL2_dw2 + dL2_dw2_tmp, dL2_dh2 + dL2_dh2_tmp, dL2_db2 + dL2_db2_tmp
+                    dL1_dw1, dL1_db1 = dL1_dw1 + dL1_dw1_tmp, dL1_db1 + dL1_db1_tmp
 
                     # 4. Update weights & biases
                     w1, b1 = gradient_descent(w1, b1, dL1_dw1, dL1_db1, learning_rate)
@@ -491,7 +490,7 @@ class VisualiseNeuralNetwork(Scene):
             print(f'Accuracy: {accuracy:.2f}%')
             new_status = Text(f'Epoch: {e:02}\tAccuracy: {accuracy:05.2f}%', font_size=1.8 * HEADER_FONT_SIZE)
             new_status.move_to(status.get_center())
-            self.play(Transform(status, new_status))
+            self.play(Transform(status, new_status), run_time=ANIMATION_RUN_TIME)
 
         # self.clear()
         self.play(*[FadeOut(obj) for obj in self.mobjects])
@@ -508,6 +507,7 @@ class VisualiseNeuralNetwork(Scene):
         return [s.animate.set_fill(color, opacity=opacity) for s in squares]
 
     def animate_gradient(self, node_1, node_2, g1_1, g2_1, g1_2, g2_2, index):
+        # WORKAROUND: have to do this for avoiding gradient overlap
         self.play(*self.update_squares_color(node_1.gradient_list, TEAL_A, 0.0),
                   *self.update_squares_color(node_2.gradient_list, TEAL_B, 0.0),
                   run_time=0.1)
@@ -569,13 +569,13 @@ class VisualiseNeuralNetwork(Scene):
             for i in range(200 // bucket_size):
                 self.play(*self.update_squares_color(node_1.gradient_list[i * bucket_size:(i + 1) * bucket_size], TEAL_E, 0.5),
                           *self.update_squares_color(node_2.gradient_list[i * bucket_size:(i + 1) * bucket_size], GREEN_C, 0.5),
-                          run_time=2 * ANIMATION_RUN_TIME)
+                          run_time=1.5 * ANIMATION_RUN_TIME)
 
             bucket_size = 25
             for i in range((200 // bucket_size) - 1, -1, -1):
                 self.play(*self.update_squares_color(node_1.gradient_list[i * bucket_size:(i + 1) * bucket_size], GRAY_A, 0.6),
                           *self.update_squares_color(node_2.gradient_list[i * bucket_size:(i + 1) * bucket_size], GRAY_A, 0.6),
-                          run_time=2 * ANIMATION_RUN_TIME)
+                          run_time=1.5 * ANIMATION_RUN_TIME)
             self.play(FadeOut(comment_text))
 
         self.play(*self.update_squares_color(node_1.gradient_list, TEAL_A, 0.0),
