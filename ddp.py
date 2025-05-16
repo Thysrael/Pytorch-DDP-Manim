@@ -165,9 +165,7 @@ class VisualNode:
     def animate_input_image(self, new_data):
         new_image = self.create_input_image(new_data)
         new_image.move_to(self.input_image.get_center())
-        old_image = self.input_image
-        self.input_image = new_image
-        return Transform(old_image, new_image, run_time=ANIMATION_RUN_TIME)
+        return Transform(self.input_image, new_image)
 
     def create_nodes(self, num_nodes, layer_output=None):
         # Create VGroup & list to hold created nodes
@@ -210,6 +208,24 @@ class VisualNode:
 
         return node_group, nodes
 
+    def animate_nodes(self, layer_output, index):
+        # 1. Create nodes with new parameters
+        new_node_group, new_nodes_list = self.create_nodes(10, layer_output)
+
+        # 2. Transform old nodes to new nodes
+        if index == 0:
+            self.h1_nodes_list = new_nodes_list
+            new_node_group.move_to(self.h1_node_group.get_center())
+            return Transform(self.h1_node_group, new_node_group)
+        elif index == 1:
+            self.h2_nodes_list = new_nodes_list
+            new_node_group.move_to(self.h2_node_group.get_center())
+            return Transform(self.h2_node_group, new_node_group)
+        else:
+            self.o_nodes_list = new_nodes_list
+            new_node_group.move_to(self.o_node_group.get_center())
+            return Transform(self.o_node_group, new_node_group)
+
     def create_connections(self, left_layer_nodes, right_layer_nodes, w):
         # Create VGroup to hold created connections
         connection_group = VGroup()
@@ -235,12 +251,31 @@ class VisualNode:
 
         return connection_group
 
+    def animate_connections(self, w, index):
+        # 1. Create connections with new parameters
+        if index == 0:
+            left_layer_centers = self.h1_nodes_list
+            right_layer_centers = self.h2_nodes_list
+        else:
+            left_layer_centers = self.h2_nodes_list
+            right_layer_centers = self.o_nodes_list
+
+        new_line_group = self.create_connections(left_layer_centers,
+                                                 right_layer_centers,
+                                                 w)
+
+        # 2. Transform old connections to new connections
+        if index == 0:
+            return Transform(self.connections_1, new_line_group)
+        else:
+            return Transform(self.connections_2, new_line_group)
+
     def create_prediction_text(self, prediction):
         # Create group
         prediction_text_group = VGroup()
 
         # Create & position text
-        prediction_text = Text(f'{prediction}', font_size=2 * HEADER_FONT_SIZE, color=BLUE)
+        prediction_text = Text(f'{prediction}', font_size=2 * HEADER_FONT_SIZE, color=TEAL)
 
         # Create text box (helps with positioning Prediction Header)
         prediction_text_box = Square(fill_opacity=0,
@@ -258,6 +293,13 @@ class VisualNode:
         prediction_text_group.add(prediction_text_box)
 
         return prediction_text_group
+
+    def animate_prediction_text(self, prediction):
+        # 1. Create prediction text with new parameters
+        new_prediction_text_group = self.create_prediction_text(prediction)
+        new_prediction_text_group.move_to(self.prediction.get_center())
+        # 2. Transform old prediction text to new prediction text
+        return Transform(self.prediction, new_prediction_text_group)
 
     def normalize(vector):
         min_val = np.min(vector)
@@ -343,7 +385,7 @@ class VisualiseNeuralNetwork(Scene):
         group_1.next_to(group_2, LEFT)
         group_2.shift(2 * RIGHT)
 
-        status = Text(f'Epoch: {0}\tAccuracy: {0:05.2f}%', font_size=1.8 * HEADER_FONT_SIZE)
+        status = Text(f'Epoch: {0:02}\tAccuracy: {0:05.2f}%', font_size=1.8 * HEADER_FONT_SIZE)
         status.shift(4 * UP)
         self.add(status)
 
@@ -353,4 +395,89 @@ class VisualiseNeuralNetwork(Scene):
         )
         self.wait(0.5)
 
-        # self.play(node_1.animate_input_image(init_image_2))
+        for e in range(epoch):
+            print(f'------------- Epoch {e} -------------')
+
+            X_tmp = 0
+            h1_tmp, h2_tmp, o_tmp = 0, 0, 0
+            dL_do_tmp = 0
+            dL3_dw3_tmp, dL3_dh2_tmp, dL3_db3_tmp = 0, 0, 0
+            dL2_dw2_tmp, dL2_dh2_tmp, dL2_db2_tmp = 0, 0, 0
+            dL1_dw1_tmp, dL1_db1_tmp = 0, 0
+
+            # random an even number
+            trace_point = np.random.randint(0, train.shape[0])
+            if trace_point % 2 != 0:
+                trace_point -= 1
+
+            for index in range(train.shape[0]):
+                # Select a single image and associated y vector
+                X = train[index:index + 1,:].T
+                y = Y[index:index + 1].T
+
+                # 1. Forward pass: compute Output/Prediction (o)
+                h1 = calculate_layer_output(w1, X, b1, relu)
+                h2 = calculate_layer_output(w2, h1, b2, relu)
+                o = calculate_layer_output(w3, h2, b3, softmax)
+
+                # 2. Compute Loss Vector
+                L = np.square(o - y)
+
+                # 3. Backpropagation
+                # Compute Loss derivative w.r.t. Output/Prediction vector (o)
+                dL_do = 2.0 * (o - y)
+                # Compute Output Layer derivatives
+                dL3_dw3, dL3_dh2, dL3_db3 = layer_backprop(dL_do, o, h2, w3, softmax)
+                # Compute Hidden Layer 2 derivatives
+                dL2_dw2, dL2_dh2, dL2_db2 = layer_backprop(dL3_dh2, h2, h1, w2, relu)
+                # Compute Hidden Layer 1 derivatives
+                dL1_dw1, _, dL1_db1 = layer_backprop(dL2_dh2, h1, X, w1, relu)
+
+                if index % 2 == 0:
+                    # record
+                    X_tmp = X
+                    h1_tmp, h2_tmp, o_tmp = h1, h2, o
+                    dL_do_tmp = dL_do
+                    dL3_dw3_tmp, dL3_dh2_tmp, dL3_db3_tmp = dL3_dw3, dL3_dh2, dL3_db3
+                    dL2_dw2_tmp, dL2_dh2_tmp, dL2_db2_tmp = dL2_dw2, dL2_dh2, dL2_db2
+                    dL1_dw1_tmp, dL1_db1_tmp = dL1_dw1, dL1_db1
+                    # TODO: animate gradient
+                else:
+                    # reduce
+                    dL_do = (dL_do + dL_do_tmp) / 2
+                    dL3_dw3, dL3_dh2, dL3_db3 = (dL3_dw3 + dL3_dw3_tmp) / 2, (dL3_dh2 + dL3_dh2_tmp) / 2, (dL3_db3 + dL3_db3_tmp) / 2
+                    dL2_dw2, dL2_dh2, dL2_db2 = (dL2_dw2 + dL2_dw2_tmp) / 2, (dL2_dh2 + dL2_dh2_tmp) / 2, (dL2_db2 + dL2_db2_tmp) / 2
+                    dL1_dw1, dL1_db1 = (dL1_dw1 + dL1_dw1_tmp) / 2, (dL1_db1 + dL1_db1_tmp) / 2
+
+                    # TODO: animate gradient
+
+                    # 4. Update weights & biases
+                    w1, b1 = gradient_descent(w1, b1, dL1_dw1, dL1_db1, learning_rate)
+                    w2, b2 = gradient_descent(w2, b2, dL2_dw2, dL2_db2, learning_rate)
+                    w3, b3 = gradient_descent(w3, b3, dL3_dw3, dL3_db3, learning_rate)
+
+                    # TODO: animate reduce
+
+                animate = True if index == trace_point + 1 else False
+                if animate:
+                    self.play(node_1.animate_input_image(X_tmp), run_time=ANIMATION_RUN_TIME)
+                    self.play(node_2.animate_input_image(X) , run_time=ANIMATION_RUN_TIME)
+                    self.play(node_1.animate_nodes(h1_tmp, 0), run_time=ANIMATION_RUN_TIME)
+                    self.play(node_2.animate_nodes(h1, 0), run_time=ANIMATION_RUN_TIME)
+                    self.play(node_1.animate_nodes(h2_tmp, 1), run_time=ANIMATION_RUN_TIME)
+                    self.play(node_2.animate_nodes(h2, 1), run_time=ANIMATION_RUN_TIME)
+                    self.play(node_1.animate_connections(w2, 0), run_time=ANIMATION_RUN_TIME)
+                    self.play(node_2.animate_connections(w2, 0), run_time=ANIMATION_RUN_TIME)
+                    self.play(node_1.animate_nodes(o_tmp, 2), run_time=ANIMATION_RUN_TIME)
+                    self.play(node_2.animate_nodes(o, 2), run_time=ANIMATION_RUN_TIME)
+                    self.play(node_1.animate_connections(w3, 1), run_time=ANIMATION_RUN_TIME)
+                    self.play(node_2.animate_connections(w3, 1), run_time=ANIMATION_RUN_TIME)
+                    self.play(node_1.animate_prediction_text(get_prediction(o_tmp)), run_time=ANIMATION_RUN_TIME)
+                    self.play(node_2.animate_prediction_text(get_prediction(o)), run_time=ANIMATION_RUN_TIME)
+
+            # Compute & print Accuracy (%)
+            accuracy = compute_accuracy(train, label, w1, b1, w2, b2, w3, b3)
+            print(f'Accuracy: {accuracy:.2f}%')
+            new_status = Text(f'Epoch: {e:02}\tAccuracy: {accuracy:05.2f}%', font_size=1.8 * HEADER_FONT_SIZE)
+            new_status.move_to(status.get_center())
+            self.play(Transform(status, new_status))
