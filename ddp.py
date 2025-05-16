@@ -1,3 +1,4 @@
+from typing_extensions import runtime
 import numpy as np
 import pandas as pd
 from manim import *
@@ -362,7 +363,7 @@ class VisualiseNeuralNetwork(Scene):
 
         # Set hyperparameter(s)
         learning_rate = 0.01
-        epoch = 5
+        epoch = 20
         previous_accuracy = 100
         accuracy = 0
 
@@ -456,7 +457,7 @@ class VisualiseNeuralNetwork(Scene):
                     w3, b3 = gradient_descent(w3, b3, dL3_dw3, dL3_db3, learning_rate)
 
                 if animate:
-                    self.animate_gradient(node_1, node_2, dL2_dw2_tmp, dL3_dw3_tmp, dL2_dw2, dL3_dw3)
+                    self.animate_gradient(node_1, node_2, dL2_dw2_tmp, dL3_dw3_tmp, dL2_dw2, dL3_dw3, e % 4)
                     self.play(node_1.animate_input_image(X_tmp),
                               node_2.animate_input_image(X),
                               run_time=ANIMATION_RUN_TIME)
@@ -492,11 +493,99 @@ class VisualiseNeuralNetwork(Scene):
             new_status.move_to(status.get_center())
             self.play(Transform(status, new_status))
 
-    def animate_gradient(self, node_1, node_2, g1_1, g2_1, g1_2, g2_2):
+        # self.clear()
+        self.play(*[FadeOut(obj) for obj in self.mobjects])
+        signature = Text('Thysrael', font='STXingkai', font_size=100)
+        date = Text('2025.05.16', font='STXingkai', font_size=60)
+        date.next_to(signature, DOWN)
+        date.shift(DOWN)
+        # signature.shift(2.75 * DOWN).shift(11.5 * RIGHT)
+        self.play(Write(signature))
+        self.play(Write(date))
+        self.wait(1)
+
+    def update_squares_color(self, squares, color, opacity):
+        return [s.animate.set_fill(color, opacity=opacity) for s in squares]
+
+    def animate_gradient(self, node_1, node_2, g1_1, g2_1, g1_2, g2_2, index):
+        self.play(*self.update_squares_color(node_1.gradient_list, TEAL_A, 0.0),
+                  *self.update_squares_color(node_2.gradient_list, TEAL_B, 0.0),
+                  run_time=0.1)
+
+        if index == 0:
+            comment_text = Text(f"Bucket Size:{25},\nSync, Backward", font_size=HEADER_FONT_SIZE)
+            comment_text.next_to(node_2.gradient, RIGHT)
+            self.add(comment_text)
+            # 4 x 50 = 200
+            bucket_size = 50
+            for i in range(200 // bucket_size):
+                self.play(*self.update_squares_color(node_1.gradient_list[i * bucket_size:(i + 1) * bucket_size], TEAL_B, 0.5),
+                          *self.update_squares_color(node_2.gradient_list[i * bucket_size:(i + 1) * bucket_size], GREEN_C, 0.5),
+                          run_time=2 * ANIMATION_RUN_TIME)
+
+            bucket_size = 25
+            for i in range(200 // bucket_size):
+                self.play(*self.update_squares_color(node_1.gradient_list[i * bucket_size:(i + 1) * bucket_size], GRAY_A, 0.6),
+                          *self.update_squares_color(node_2.gradient_list[i * bucket_size:(i + 1) * bucket_size], GRAY_A, 0.6),
+                          run_time=2 * ANIMATION_RUN_TIME)
+            self.play(FadeOut(comment_text))
+
+        elif index == 1:
+            bucket_size = 25
+            comment_text = Text(f"Bucket Size:{bucket_size},\nASync, Backward", font_size=HEADER_FONT_SIZE)
+            comment_text.next_to(node_2.gradient, RIGHT)
+            self.add(comment_text)
+            for i in range(200 // bucket_size):
+                if i % 2 == 0:
+                    self.play(*self.update_squares_color(node_1.gradient_list[i * bucket_size:i * bucket_size + 50], TEAL_E, 0.5),
+                              *self.update_squares_color(node_2.gradient_list[i * bucket_size:i * bucket_size + 50], GREEN_C, 0.5),
+                              run_time=2 * ANIMATION_RUN_TIME)
+                self.play(*self.update_squares_color(node_1.gradient_list[i * bucket_size:(i + 1) * bucket_size], GRAY_A, 0.6),
+                          *self.update_squares_color(node_2.gradient_list[i * bucket_size:(i + 1) * bucket_size], GRAY_A, 0.6),
+                          run_time=2 * ANIMATION_RUN_TIME)
+            self.play(FadeOut(comment_text))
+
+        elif index == 2:
+            bucket_size = 10
+            comment_text = Text(f"Bucket Size:{bucket_size},\nASync, Backward", font_size=HEADER_FONT_SIZE)
+            comment_text.next_to(node_2.gradient, RIGHT)
+            self.add(comment_text)
+            for i in range(200 // bucket_size):
+                if i % 5 == 0:
+                    self.play(*self.update_squares_color(node_1.gradient_list[i * bucket_size:i * bucket_size + 50], TEAL_E, 0.5),
+                              *self.update_squares_color(node_2.gradient_list[i * bucket_size:i * bucket_size + 50], GREEN_C, 0.5),
+                              run_time=2 * ANIMATION_RUN_TIME)
+                self.play(*self.update_squares_color(node_1.gradient_list[i * bucket_size:(i + 1) * bucket_size], GRAY_A, 0.6),
+                          *self.update_squares_color(node_2.gradient_list[i * bucket_size:(i + 1) * bucket_size], GRAY_A, 0.6),
+                          run_time=2 * ANIMATION_RUN_TIME)
+            self.play(FadeOut(comment_text))
+
+        else:
+            comment_text = Text(f"Bucket Size:{25},\nSync, Forward", font_size=HEADER_FONT_SIZE)
+            comment_text.next_to(node_2.gradient, RIGHT)
+            self.add(comment_text)
+            # 4 x 50 = 200
+            bucket_size = 50
+            for i in range(200 // bucket_size):
+                self.play(*self.update_squares_color(node_1.gradient_list[i * bucket_size:(i + 1) * bucket_size], TEAL_E, 0.5),
+                          *self.update_squares_color(node_2.gradient_list[i * bucket_size:(i + 1) * bucket_size], GREEN_C, 0.5),
+                          run_time=2 * ANIMATION_RUN_TIME)
+
+            bucket_size = 25
+            for i in range((200 // bucket_size) - 1, -1, -1):
+                self.play(*self.update_squares_color(node_1.gradient_list[i * bucket_size:(i + 1) * bucket_size], GRAY_A, 0.6),
+                          *self.update_squares_color(node_2.gradient_list[i * bucket_size:(i + 1) * bucket_size], GRAY_A, 0.6),
+                          run_time=2 * ANIMATION_RUN_TIME)
+            self.play(FadeOut(comment_text))
+
+        self.play(*self.update_squares_color(node_1.gradient_list, TEAL_A, 0.0),
+                  *self.update_squares_color(node_2.gradient_list, TEAL_B, 0.0),
+                  run_time=0.1)
+
         new_gradient_1, node_1.gradient_list = node_1.create_gradient(g1_1, g2_1)
         new_gradient_1.move_to(node_1.gradient.get_center())
-        t_1 = Transform(node_1.gradient, new_gradient_1)
+        t_1 = ReplacementTransform(node_1.gradient, new_gradient_1)
         new_gradient_2, node_2.gradient_list = node_2.create_gradient(g1_2, g2_2)
         new_gradient_2.move_to(node_2.gradient.get_center())
-        t_2 = Transform(node_2.gradient, new_gradient_2)
+        t_2 = ReplacementTransform(node_2.gradient, new_gradient_2)
         self.play(t_1, t_2)
